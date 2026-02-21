@@ -25,8 +25,9 @@ export default function TrimScreen() {
 
   useEffect(() => {
     if (!trim?.attemptId) return;
+    const mimeType = attempts.find(a => a.id === trim.attemptId)?.mimeType ?? 'video/mp4';
     let url = '';
-    getBlobUrl(trim.attemptId).then(u => { url = u; setBlobUrl(u); });
+    getBlobUrl(trim.attemptId, mimeType).then(u => { url = u; setBlobUrl(u); });
     return () => { if (url) URL.revokeObjectURL(url); };
   }, [trim?.attemptId]);
 

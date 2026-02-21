@@ -47,6 +47,7 @@ export default function ImportScreen() {
         id,
         name: file.name.replace(/\.[^.]+$/, ''),
         blobKey: id,
+        mimeType: file.type || 'video/mp4',
         duration: 0,
         trimStart: 0,
         trimEnd: 0,

@@ -68,10 +68,10 @@ export async function updateAttemptRecord(record: AttemptRecord): Promise<void> 
   await db.put('attempts', record);
 }
 
-export async function getBlobUrl(blobKey: string): Promise<string> {
+export async function getBlobUrl(blobKey: string, mimeType = 'video/mp4'): Promise<string> {
   const db = await getDb();
   const buffer = await db.get('blobs', blobKey);
   if (!buffer) throw new Error(`Blob not found: ${blobKey}`);
-  const blob = new Blob([buffer], { type: 'video/mp4' });
+  const blob = new Blob([buffer], { type: mimeType });
   return URL.createObjectURL(blob);
 }

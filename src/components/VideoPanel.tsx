@@ -24,7 +24,7 @@ const VideoPanel = forwardRef<HTMLVideoElement, VideoPanelProps>(
 
     useEffect(() => {
       let url = '';
-      getBlobUrl(attempt.blobKey).then(u => { url = u; setBlobUrl(u); });
+      getBlobUrl(attempt.blobKey, attempt.mimeType).then(u => { url = u; setBlobUrl(u); });
       return () => { if (url) URL.revokeObjectURL(url); };
     }, [attempt.blobKey]);
 
