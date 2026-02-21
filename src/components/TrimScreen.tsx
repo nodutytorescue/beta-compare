@@ -20,7 +20,6 @@ export default function TrimScreen() {
   const [currentTime, setCurrentTime] = useState(0);
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -51,13 +50,6 @@ export default function TrimScreen() {
     const t = (Number(e.target.value) / 1000) * duration;
     v.currentTime = t;
     setCurrentTime(t);
-  };
-
-  const handlePlayPause = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.paused) { v.play(); setIsPlaying(true); }
-    else { v.pause(); setIsPlaying(false); }
   };
 
   const handleSetStart = () => {
@@ -104,9 +96,9 @@ export default function TrimScreen() {
             className="max-h-full max-w-full"
             playsInline
             muted
+            preload="auto"
             onLoadedMetadata={handleMetadata}
             onTimeUpdate={handleTimeUpdate}
-            onEnded={() => setIsPlaying(false)}
           />
         )}
       </div>
@@ -126,18 +118,12 @@ export default function TrimScreen() {
           onChange={handleScrub}
         />
 
-        <div className="flex items-center gap-2">
+        <div className="flex gap-2">
           <button
             onClick={handleSetStart}
             className="flex-1 text-xs bg-emerald-900 hover:bg-emerald-800 text-emerald-300 py-2.5 rounded-lg transition-colors font-medium"
           >
             ← Set Start
-          </button>
-          <button
-            onClick={handlePlayPause}
-            className="w-11 h-11 flex items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 text-white transition-colors flex-shrink-0"
-          >
-            {isPlaying ? '⏸' : '▶'}
           </button>
           <button
             onClick={handleSetEnd}
