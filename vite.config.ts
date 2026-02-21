@@ -7,11 +7,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['pose_landmarker_lite.task'],
       manifest: {
         name: 'Beta Compare',
         short_name: 'BetaCompare',
-        description: 'Side-by-side bouldering video comparison synced by route progress',
+        description: 'Side-by-side bouldering video comparison',
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',
@@ -22,42 +21,14 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm,task}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/storage\.googleapis\.com\/mediapipe-models\/.*/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'mediapipe-models',
-              expiration: { maxAgeSeconds: 90 * 24 * 60 * 60 }
-            }
-          }
-        ]
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}']
       }
     })
   ],
-  optimizeDeps: {
-    exclude: ['@mediapipe/tasks-vision']
-  },
   server: {
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless'
-    }
-  },
-  preview: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'credentialless'
-    }
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          mediapipe: ['@mediapipe/tasks-vision']
-        }
-      }
     }
   }
 });

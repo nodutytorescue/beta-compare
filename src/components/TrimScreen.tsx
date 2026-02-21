@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../store/appStore';
-import { getBlobUrl } from '../lib/db';
+import { getBlobUrl, updateAttemptRecord } from '../lib/db';
 
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -10,7 +10,8 @@ function formatTime(s: number): string {
 
 export default function TrimScreen() {
   const trim = useAppStore(s => s.trim);
-  const goToHoldMarking = useAppStore(s => s.goToHoldMarking);
+  const attempts = useAppStore(s => s.attempts);
+  const addAttempt = useAppStore(s => s.addAttempt);
   const goToImport = useAppStore(s => s.goToImport);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -20,6 +21,7 @@ export default function TrimScreen() {
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!trim?.attemptId) return;
@@ -67,18 +69,25 @@ export default function TrimScreen() {
     if (currentTime <= trimStart) setTrimStart(0);
   };
 
-  const handleProcess = () => {
+  const handleDone = async () => {
     const v = videoRef.current;
-    if (!v) return;
+    if (!v || duration === 0) return;
     v.pause();
-    goToHoldMarking(trim.attemptId, trim.fileName, trimStart, trimEnd);
+    setSaving(true);
+
+    const existing = attempts.find(a => a.id === trim.attemptId);
+    if (existing) {
+      const updated = { ...existing, duration, trimStart, trimEnd };
+      await updateAttemptRecord(updated);
+      addAttempt(updated);
+    }
+    goToImport();
   };
 
   const isFullVideo = trimStart === 0 && trimEnd === duration;
 
   return (
     <div className="h-dvh flex flex-col bg-slate-900 text-slate-100">
-      {/* Header */}
       <header className="flex items-center px-4 py-3 bg-slate-800 border-b border-slate-700 flex-shrink-0">
         <div>
           <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Mark climbing portion</p>
@@ -86,7 +95,6 @@ export default function TrimScreen() {
         </div>
       </header>
 
-      {/* Video */}
       <div className="flex-1 min-h-0 bg-black flex items-center justify-center">
         {blobUrl && (
           <video
@@ -102,15 +110,12 @@ export default function TrimScreen() {
         )}
       </div>
 
-      {/* Controls */}
       <div className="flex-shrink-0 p-4 bg-slate-900 flex flex-col gap-3">
-        {/* Time */}
         <div className="flex justify-between text-xs text-slate-500">
           <span>{formatTime(currentTime)}</span>
           <span>{formatTime(duration)}</span>
         </div>
 
-        {/* Seek scrubber */}
         <input
           type="range"
           min="0"
@@ -120,7 +125,6 @@ export default function TrimScreen() {
           onChange={handleScrub}
         />
 
-        {/* Mark buttons + play */}
         <div className="flex items-center gap-2">
           <button
             onClick={handleSetStart}
@@ -142,20 +146,18 @@ export default function TrimScreen() {
           </button>
         </div>
 
-        {/* Trim summary */}
         <p className="text-center text-xs text-slate-400 min-h-[1rem]">
           {isFullVideo
             ? 'Scrub and mark where the climb starts and ends'
             : `${formatTime(trimStart)} → ${formatTime(trimEnd)} · ${(trimEnd - trimStart).toFixed(1)}s selected`}
         </p>
 
-        {/* Process */}
         <button
-          onClick={handleProcess}
-          disabled={!blobUrl || duration === 0}
+          onClick={handleDone}
+          disabled={!blobUrl || duration === 0 || saving}
           className="w-full bg-sky-600 hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors"
         >
-          Mark Holds →
+          {saving ? 'Saving…' : 'Done →'}
         </button>
 
         <button

@@ -3,6 +3,12 @@ import { useAppStore } from '../store/appStore';
 import { saveAttempt, deleteAttempt } from '../lib/db';
 import type { AttemptRecord } from '../types';
 
+function formatDuration(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = Math.round(s % 60);
+  return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+}
+
 export default function ImportScreen() {
   const attempts = useAppStore(s => s.attempts);
   const addAttempt = useAppStore(s => s.addAttempt);
@@ -15,6 +21,8 @@ export default function ImportScreen() {
   const [importError, setImportError] = useState<string | null>(null);
 
   const toggleSelect = (id: string) => {
+    const attempt = attempts.find(a => a.id === id);
+    if (!attempt || attempt.duration === 0) return; // not yet trimmed
     setSelectedIds(prev =>
       prev.includes(id)
         ? prev.filter(x => x !== id)
@@ -39,9 +47,10 @@ export default function ImportScreen() {
         id,
         name: file.name.replace(/\.[^.]+$/, ''),
         blobKey: id,
-        progressCurve: [],
         duration: 0,
-        createdAt: Date.now()
+        trimStart: 0,
+        trimEnd: 0,
+        createdAt: Date.now(),
       };
 
       await saveAttempt(record, buffer);
@@ -71,10 +80,8 @@ export default function ImportScreen() {
 
   return (
     <div className="h-dvh flex flex-col bg-slate-900 text-slate-100">
-      {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 bg-slate-800 border-b border-slate-700 flex-shrink-0">
         <h1 className="text-lg font-bold tracking-tight">Beta Compare</h1>
-        {/* <label> natively triggers the file picker without needing JS .click() */}
         <label className={`cursor-pointer bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors ${importing ? 'opacity-50 pointer-events-none' : ''}`}>
           {importing ? 'Reading…' : '+ Import Video'}
           <input
@@ -87,7 +94,6 @@ export default function ImportScreen() {
         </label>
       </header>
 
-      {/* Import error */}
       {importError && (
         <div className="mx-4 mt-3 flex-shrink-0 bg-red-900/40 border border-red-700 rounded-lg px-3 py-2 text-sm text-red-300 flex items-start gap-2">
           <span className="flex-shrink-0">⚠️</span>
@@ -96,27 +102,31 @@ export default function ImportScreen() {
         </div>
       )}
 
-      {/* Attempt list */}
       <main className="flex-1 overflow-y-auto p-4">
         {attempts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-500">
             <div className="text-6xl">🧗</div>
             <p className="text-center text-sm max-w-xs">
-              Import two climbing attempts to compare route progress side-by-side.
+              Import two climbing attempts to compare them side by side.
             </p>
           </div>
         ) : (
           <ul className="flex flex-col gap-2">
             {attempts.map(attempt => {
+              const trimmed = attempt.duration > 0;
               const isSelected = selectedIds.includes(attempt.id);
               const selIdx = selectedIds.indexOf(attempt.id);
+              const clipLen = attempt.trimEnd - attempt.trimStart;
+
               return (
                 <li
                   key={attempt.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                    isSelected
-                      ? 'border-sky-500 bg-sky-900/30'
-                      : 'border-slate-700 bg-slate-800 hover:border-slate-600'
+                  className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                    !trimmed
+                      ? 'border-slate-700 bg-slate-800 opacity-50 cursor-default'
+                      : isSelected
+                      ? 'border-sky-500 bg-sky-900/30 cursor-pointer'
+                      : 'border-slate-700 bg-slate-800 hover:border-slate-600 cursor-pointer'
                   }`}
                   onClick={() => toggleSelect(attempt.id)}
                 >
@@ -129,19 +139,29 @@ export default function ImportScreen() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate text-sm">{attempt.name}</p>
                     <p className="text-xs text-slate-500">
-                      {attempt.progressCurve.length > 0
-                        ? `${attempt.progressCurve.length} frames · ${attempt.duration.toFixed(1)}s`
-                        : 'Not yet processed'}
+                      {trimmed
+                        ? `${formatDuration(clipLen)} climbing · ${formatDuration(attempt.duration)} total`
+                        : 'Needs trim'}
                     </p>
                   </div>
 
-                  <button
-                    onClick={e => { e.stopPropagation(); handleDelete(attempt.id); }}
-                    className="text-slate-600 hover:text-red-400 transition-colors px-1"
-                    aria-label="Delete attempt"
-                  >
-                    🗑
-                  </button>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {!trimmed && (
+                      <button
+                        onClick={e => { e.stopPropagation(); goToTrim(attempt.id, attempt.name); }}
+                        className="text-xs text-sky-400 hover:text-sky-300 transition-colors"
+                      >
+                        Trim
+                      </button>
+                    )}
+                    <button
+                      onClick={e => { e.stopPropagation(); handleDelete(attempt.id); }}
+                      className="text-slate-600 hover:text-red-400 transition-colors px-1"
+                      aria-label="Delete attempt"
+                    >
+                      🗑
+                    </button>
+                  </div>
                 </li>
               );
             })}
