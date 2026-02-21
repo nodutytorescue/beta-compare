@@ -69,7 +69,12 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
           });
 
         await Promise.all([readyPromise(va, urlA), readyPromise(vb, urlB)]);
-        if (!cancelled) setVideosReady(true);
+        if (!cancelled) {
+          // Start both videos at their trim start so playback begins at the climb
+          va.currentTime = attemptA.trimStart ?? 0;
+          vb.currentTime = attemptB.trimStart ?? 0;
+          setVideosReady(true);
+        }
       } catch (err) {
         console.error('Failed to load videos:', err);
       }

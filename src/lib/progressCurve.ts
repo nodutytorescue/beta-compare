@@ -181,10 +181,20 @@ export function timeAtProgress(
     if (t !== null) return t;
   }
 
-  // Clamp to nearest endpoint
-  const distFirst = Math.abs(curve[0].progress - targetProgress);
-  const distLast = Math.abs(curve[curve.length - 1].progress - targetProgress);
-  return distFirst <= distLast ? curve[0].timestamp : curve[curve.length - 1].timestamp;
+  // Clamp to appropriate endpoint based on whether target is out of range
+  const allProgress = curve.map(p => p.progress);
+  const minP = Math.min(...allProgress);
+  const maxP = Math.max(...allProgress);
+  if (targetProgress >= maxP) return curve[curve.length - 1].timestamp;
+  if (targetProgress <= minP) return curve[0].timestamp;
+
+  // Global nearest (rare: target is within range but no crossing found)
+  let bestIdx = 0, bestDist = Infinity;
+  for (let i = 0; i < curve.length; i++) {
+    const d = Math.abs(curve[i].progress - targetProgress);
+    if (d < bestDist) { bestDist = d; bestIdx = i; }
+  }
+  return curve[bestIdx].timestamp;
 }
 
 /** Group consecutive low-confidence frames into ranges for sparkline shading. */
