@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+    background-color: #0f172a;
+    color: #f1f5f9;
+  }
+}
+
+/* Range input styling */
+@layer components {
+  .scrubber {
+    @apply w-full h-1 appearance-none rounded-full bg-slate-600 cursor-pointer;
+  }
+  .scrubber::-webkit-slider-thumb {
+    @apply appearance-none w-4 h-4 rounded-full bg-sky-400 cursor-pointer;
+  }
+  .scrubber::-moz-range-thumb {
+    @apply w-4 h-4 rounded-full bg-sky-400 border-0 cursor-pointer;
+  }
+}
