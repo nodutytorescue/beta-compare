@@ -7,7 +7,7 @@ export default function ImportScreen() {
   const attempts = useAppStore(s => s.attempts);
   const addAttempt = useAppStore(s => s.addAttempt);
   const removeAttempt = useAppStore(s => s.removeAttempt);
-  const goToProcessing = useAppStore(s => s.goToProcessing);
+  const goToTrim = useAppStore(s => s.goToTrim);
   const goToPlayer = useAppStore(s => s.goToPlayer);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -46,7 +46,7 @@ export default function ImportScreen() {
 
       await saveAttempt(record, buffer);
       addAttempt(record);
-      goToProcessing(id, file.name);
+      goToTrim(id, file.name);
     } catch (err) {
       console.error('Import failed:', err);
       setImportError(err instanceof Error ? err.message : 'Failed to read file. Try a smaller video.');

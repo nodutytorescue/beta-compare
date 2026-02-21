@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useAppStore } from './store/appStore';
 import { getAllAttempts } from './lib/db';
 import ImportScreen from './components/ImportScreen';
+import TrimScreen from './components/TrimScreen';
 import ProcessingScreen from './components/ProcessingScreen';
 import PlayerScreen from './components/PlayerScreen';
 
@@ -14,6 +15,7 @@ export default function App() {
     getAllAttempts().then(setAttempts).catch(console.error);
   }, [setAttempts]);
 
+  if (screen === 'trim') return <TrimScreen />;
   if (screen === 'processing') return <ProcessingScreen />;
   if (screen === 'player') return <PlayerScreen />;
   return <ImportScreen />;

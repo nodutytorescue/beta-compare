@@ -17,14 +17,23 @@ export interface AttemptRecord {
   blobKey: string;          // key into idb 'blobs' store (same as id)
   progressCurve: ProgressPoint[];
   duration: number;         // seconds
+  trimStart?: number;       // seconds — start of climbing portion
+  trimEnd?: number;         // seconds — end of climbing portion
   createdAt: number;        // Date.now()
 }
 
-export type Screen = 'import' | 'processing' | 'player';
+export type Screen = 'import' | 'trim' | 'processing' | 'player';
+
+export interface TrimState {
+  attemptId: string;
+  fileName: string;
+}
 
 export interface ProcessingState {
   attemptId: string;
   fileName: string;
+  trimStart: number;        // seconds
+  trimEnd: number;          // seconds
   totalFrames: number;
   processedFrames: number;
 }

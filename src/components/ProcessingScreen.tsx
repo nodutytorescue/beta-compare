@@ -76,7 +76,12 @@ export default function ProcessingScreen() {
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>('loading-video');
 
-  const runProcessing = useCallback(async (attemptId: string, fileName: string) => {
+  const runProcessing = useCallback(async (
+    attemptId: string,
+    fileName: string,
+    trimStart: number,
+    trimEnd: number
+  ) => {
     abortRef.current = false;
     setError(null);
     setStage('loading-video');
@@ -100,10 +105,12 @@ export default function ProcessingScreen() {
     if (abortRef.current) { URL.revokeObjectURL(blobUrl); return; }
 
     const duration = video.duration;
+    const clampedEnd = Math.min(trimEnd, duration);
+    const clampedStart = Math.min(trimStart, clampedEnd);
     canvas.width = 256;
     canvas.height = Math.round(256 * (video.videoHeight / video.videoWidth)) || 256;
 
-    const totalFrames = Math.ceil(duration * (FPS / FRAME_STEP));
+    const totalFrames = Math.ceil((clampedEnd - clampedStart) * (FPS / FRAME_STEP));
     setTotalFrames(totalFrames);
 
     // ── 2. Get (or init) landmarker ─────────────────────────────────────────
@@ -118,7 +125,7 @@ export default function ProcessingScreen() {
     for (let i = 0; i < totalFrames; i++) {
       if (abortRef.current) break;
 
-      const timestampMs = Math.round((i * FRAME_STEP / FPS) * 1000);
+      const timestampMs = Math.round((clampedStart + i * FRAME_STEP / FPS) * 1000);
       video.currentTime = timestampMs / 1000;
       await new Promise<void>(resolve =>
         video.addEventListener('seeked', () => resolve(), { once: true })
@@ -147,7 +154,7 @@ export default function ProcessingScreen() {
     const curve = buildProgressCurve(results);
     const existing = await getAttempt(attemptId);
     if (existing) {
-      const updated: AttemptRecord = { ...existing, progressCurve: curve, duration };
+      const updated: AttemptRecord = { ...existing, progressCurve: curve, duration, trimStart: clampedStart, trimEnd: clampedEnd };
       await updateAttemptRecord(updated);
       addAttempt(updated);
     }
@@ -158,7 +165,7 @@ export default function ProcessingScreen() {
 
   useEffect(() => {
     if (!processing?.attemptId) return;
-    runProcessing(processing.attemptId, processing.fileName).catch(err => {
+    runProcessing(processing.attemptId, processing.fileName, processing.trimStart, processing.trimEnd).catch(err => {
       console.error('Processing failed:', err);
       setError(err instanceof Error ? err.message : String(err));
     });

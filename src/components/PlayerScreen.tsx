@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAppStore } from '../store/appStore';
 import { getBlobUrl } from '../lib/db';
-import { timeAtProgress } from '../lib/progressCurve';
+import { timeAtProgress, normalizeJointCurves } from '../lib/progressCurve';
 import { SyncController } from '../lib/syncLogic';
 import type { AttemptRecord, SyncMarker } from '../types';
 import VideoPanel from './VideoPanel';
@@ -87,11 +87,16 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
     const fv = followerVideoRef.current;
     if (!lv || !fv) return;
 
+    const [normLeader, normFollower] = normalizeJointCurves(
+      leaderAttempt.progressCurve,
+      followerAttempt.progressCurve
+    );
+
     syncRef.current.configure({
       leader: lv,
       follower: fv,
-      leaderCurve: leaderAttempt.progressCurve,
-      followerCurve: followerAttempt.progressCurve,
+      leaderCurve: normLeader,
+      followerCurve: normFollower,
       syncMarkers,
       leaderRole: leader,
       onProgressUpdate: (progress) => {
@@ -129,11 +134,20 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
     if (leaderVideoRef.current) leaderVideoRef.current.playbackRate = speed;
   }, [leaderVideoRef, setPlaybackSpeed]);
 
+  const normLeaderCurveRef = useRef(leaderAttempt.progressCurve);
+  useEffect(() => {
+    const [normLeader] = normalizeJointCurves(
+      leaderAttempt.progressCurve,
+      followerAttempt.progressCurve
+    );
+    normLeaderCurveRef.current = normLeader;
+  }, [leaderAttempt.progressCurve, followerAttempt.progressCurve]);
+
   const handleScrub = useCallback((progress: number) => {
     const lv = leaderVideoRef.current;
     if (!lv) return;
 
-    const curve = leaderAttempt.progressCurve;
+    const curve = normLeaderCurveRef.current;
     const targetTime = curve.length > 0
       ? timeAtProgress(curve, progress) / 1000
       : progress * (lv.duration || 0);
@@ -141,7 +155,7 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
     lv.currentTime = targetTime;
     // Sync follower only after the leader's seek has actually landed
     lv.addEventListener('seeked', () => syncRef.current.syncOnce(), { once: true });
-  }, [leaderVideoRef, leaderAttempt.progressCurve]);
+  }, [leaderVideoRef]);
 
   const handleAddMarker = useCallback((marker: SyncMarker) => {
     addSyncMarker(marker);

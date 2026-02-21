@@ -86,17 +86,41 @@ export function normalizeProgressCurve(points: ProgressPoint[]): ProgressPoint[]
 
 // ─── Convenience pipeline ────────────────────────────────────────────────────
 
+/** Build a raw (unnormalized) progress curve. Normalize jointly at compare time. */
 export function buildProgressCurve(
   frames: RawFrameResult[],
   smoothWindow = 15
 ): ProgressPoint[] {
-  // Sort by timestamp to be safe
   const sorted = [...frames].sort((a, b) => a.timestampMs - b.timestampMs);
   let curve = extractHipProgress(sorted);
   curve = interpolateGaps(curve);
   curve = applyMovingAverage(curve, smoothWindow);
-  curve = normalizeProgressCurve(curve);
+  // No per-video normalization — curves stay in raw hip-Y space so both
+  // videos share the same absolute scale for joint normalization at player time.
   return curve;
+}
+
+/**
+ * Normalize two curves together using their shared min/max from detected frames.
+ * Both curves end up on the same [0,1] scale:
+ *   0 = lowest hip position across either attempt (start holds)
+ *   1 = highest hip position across either attempt (top of route)
+ */
+export function normalizeJointCurves(
+  curveA: ProgressPoint[],
+  curveB: ProgressPoint[]
+): [ProgressPoint[], ProgressPoint[]] {
+  const detected = [
+    ...curveA.filter(p => p.confidence > 0).map(p => p.progress),
+    ...curveB.filter(p => p.confidence > 0).map(p => p.progress),
+  ];
+  if (detected.length === 0) return [curveA, curveB];
+  const min = Math.min(...detected);
+  const max = Math.max(...detected);
+  if (max === min) return [curveA, curveB];
+  const norm = (curve: ProgressPoint[]): ProgressPoint[] =>
+    curve.map(p => ({ ...p, progress: (p.progress - min) / (max - min) }));
+  return [norm(curveA), norm(curveB)];
 }
 
 // ─── Query helpers ───────────────────────────────────────────────────────────

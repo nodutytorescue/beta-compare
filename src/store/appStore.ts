@@ -1,16 +1,18 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import type { AttemptRecord, ComparisonState, ProcessingState, Screen, SyncMarker } from '../types';
+import type { AttemptRecord, ComparisonState, ProcessingState, Screen, SyncMarker, TrimState } from '../types';
 
 interface AppState {
   screen: Screen;
   attempts: AttemptRecord[];
+  trim: TrimState | null;
   processing: ProcessingState | null;
   comparison: ComparisonState | null;
 
   // Navigation
   goToImport: () => void;
-  goToProcessing: (attemptId: string, fileName: string) => void;
+  goToTrim: (attemptId: string, fileName: string) => void;
+  goToProcessing: (attemptId: string, fileName: string, trimStart: number, trimEnd: number) => void;
   goToPlayer: (a: AttemptRecord, b: AttemptRecord) => void;
 
   // Attempt library
@@ -36,20 +38,28 @@ export const useAppStore = create<AppState>()(
   immer((set) => ({
     screen: 'import',
     attempts: [],
+    trim: null,
     processing: null,
     comparison: null,
 
     goToImport: () =>
       set(state => {
         state.screen = 'import';
+        state.trim = null;
         state.processing = null;
         state.comparison = null;
       }),
 
-    goToProcessing: (attemptId, fileName) =>
+    goToTrim: (attemptId, fileName) =>
+      set(state => {
+        state.screen = 'trim';
+        state.trim = { attemptId, fileName };
+      }),
+
+    goToProcessing: (attemptId, fileName, trimStart, trimEnd) =>
       set(state => {
         state.screen = 'processing';
-        state.processing = { attemptId, fileName, totalFrames: 0, processedFrames: 0 };
+        state.processing = { attemptId, fileName, trimStart, trimEnd, totalFrames: 0, processedFrames: 0 };
       }),
 
     goToPlayer: (a, b) =>
