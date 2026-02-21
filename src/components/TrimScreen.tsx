@@ -37,6 +37,7 @@ export default function TrimScreen() {
     if (!v) return;
     setDuration(v.duration);
     setTrimEnd(v.duration);
+    v.pause(); // stop autoplay after first frame is visible
   };
 
   const handleTimeUpdate = () => {
@@ -96,6 +97,7 @@ export default function TrimScreen() {
             className="max-h-full max-w-full"
             playsInline
             muted
+            autoPlay
             preload="auto"
             onLoadedMetadata={handleMetadata}
             onTimeUpdate={handleTimeUpdate}
