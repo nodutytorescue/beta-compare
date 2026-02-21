@@ -180,22 +180,26 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
 
   return (
     <div className="h-dvh flex flex-col bg-slate-900 text-slate-100 overflow-hidden">
-      {/* Videos */}
+      {/* Videos — leader always rendered on the left via CSS order */}
       <div className="flex flex-row flex-1 min-h-0 gap-1 p-1">
-        <VideoPanel
-          ref={videoARef}
-          attempt={attemptA}
-          isLeader={leader === 'A'}
-          label="A"
-          onSetLeader={() => setLeader('A')}
-        />
-        <VideoPanel
-          ref={videoBRef}
-          attempt={attemptB}
-          isLeader={leader === 'B'}
-          label="B"
-          onSetLeader={() => setLeader('B')}
-        />
+        <div className="flex-1 min-h-0 flex flex-col" style={{ order: leader === 'A' ? 0 : 1 }}>
+          <VideoPanel
+            ref={videoARef}
+            attempt={attemptA}
+            isLeader={leader === 'A'}
+            label="A"
+            onSetLeader={() => setLeader('A')}
+          />
+        </div>
+        <div className="flex-1 min-h-0 flex flex-col" style={{ order: leader === 'A' ? 1 : 0 }}>
+          <VideoPanel
+            ref={videoBRef}
+            attempt={attemptB}
+            isLeader={leader === 'B'}
+            label="B"
+            onSetLeader={() => setLeader('B')}
+          />
+        </div>
       </div>
 
       {/* Controls panel */}
