@@ -44,6 +44,7 @@ export interface ComparisonState {
 export interface WorkerInitMessage {
   type: 'INIT';
   modelUrl: string;
+  wasmBaseUrl: string;
 }
 
 export interface WorkerProcessFrameMessage {

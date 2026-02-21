@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useAppStore } from '../store/appStore';
 import { saveAttempt, deleteAttempt } from '../lib/db';
 import type { AttemptRecord } from '../types';
@@ -11,7 +11,8 @@ export default function ImportScreen() {
   const goToPlayer = useAppStore(s => s.goToPlayer);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev =>
@@ -19,30 +20,39 @@ export default function ImportScreen() {
         ? prev.filter(x => x !== id)
         : prev.length < 2
         ? [...prev, id]
-        : [prev[1], id] // replace oldest
+        : [prev[1], id]
     );
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.currentTarget.value = '';
     if (!file) return;
-    e.target.value = '';
 
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const buffer = await file.arrayBuffer();
+    setImportError(null);
+    setImporting(true);
+    try {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const buffer = await file.arrayBuffer();
 
-    const record: AttemptRecord = {
-      id,
-      name: file.name.replace(/\.[^.]+$/, ''),
-      blobKey: id,
-      progressCurve: [],
-      duration: 0,
-      createdAt: Date.now()
-    };
+      const record: AttemptRecord = {
+        id,
+        name: file.name.replace(/\.[^.]+$/, ''),
+        blobKey: id,
+        progressCurve: [],
+        duration: 0,
+        createdAt: Date.now()
+      };
 
-    await saveAttempt(record, buffer);
-    addAttempt(record);
-    goToProcessing(id, file.name);
+      await saveAttempt(record, buffer);
+      addAttempt(record);
+      goToProcessing(id, file.name);
+    } catch (err) {
+      console.error('Import failed:', err);
+      setImportError(err instanceof Error ? err.message : 'Failed to read file. Try a smaller video.');
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -64,20 +74,27 @@ export default function ImportScreen() {
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 bg-slate-800 border-b border-slate-700 flex-shrink-0">
         <h1 className="text-lg font-bold tracking-tight">Beta Compare</h1>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          + Import Video
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="video/*"
-          className="hidden"
-          onChange={handleFileChange}
-        />
+        {/* <label> natively triggers the file picker without needing JS .click() */}
+        <label className={`cursor-pointer bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors ${importing ? 'opacity-50 pointer-events-none' : ''}`}>
+          {importing ? 'Reading…' : '+ Import Video'}
+          <input
+            type="file"
+            accept="video/*,video/mp4,video/quicktime,video/webm,video/x-m4v"
+            className="sr-only"
+            onChange={handleFileChange}
+            disabled={importing}
+          />
+        </label>
       </header>
+
+      {/* Import error */}
+      {importError && (
+        <div className="mx-4 mt-3 flex-shrink-0 bg-red-900/40 border border-red-700 rounded-lg px-3 py-2 text-sm text-red-300 flex items-start gap-2">
+          <span className="flex-shrink-0">⚠️</span>
+          <span>{importError}</span>
+          <button onClick={() => setImportError(null)} className="ml-auto flex-shrink-0 text-red-500 hover:text-red-300">✕</button>
+        </div>
+      )}
 
       {/* Attempt list */}
       <main className="flex-1 overflow-y-auto p-4">
@@ -103,18 +120,12 @@ export default function ImportScreen() {
                   }`}
                   onClick={() => toggleSelect(attempt.id)}
                 >
-                  {/* Selection badge */}
-                  <div
-                    className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold flex-shrink-0 border-2 ${
-                      isSelected
-                        ? 'border-sky-400 bg-sky-600 text-white'
-                        : 'border-slate-600 text-slate-500'
-                    }`}
-                  >
+                  <div className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold flex-shrink-0 border-2 ${
+                    isSelected ? 'border-sky-400 bg-sky-600 text-white' : 'border-slate-600 text-slate-500'
+                  }`}>
                     {isSelected ? selIdx + 1 : ''}
                   </div>
 
-                  {/* Info */}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate text-sm">{attempt.name}</p>
                     <p className="text-xs text-slate-500">
@@ -124,7 +135,6 @@ export default function ImportScreen() {
                     </p>
                   </div>
 
-                  {/* Delete */}
                   <button
                     onClick={e => { e.stopPropagation(); handleDelete(attempt.id); }}
                     className="text-slate-600 hover:text-red-400 transition-colors px-1"
@@ -139,7 +149,6 @@ export default function ImportScreen() {
         )}
       </main>
 
-      {/* Footer CTA */}
       {canCompare && (
         <footer className="px-4 py-3 bg-slate-800 border-t border-slate-700 flex-shrink-0">
           <button

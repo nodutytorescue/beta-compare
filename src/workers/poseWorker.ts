@@ -52,42 +52,30 @@ self.addEventListener('message', async (event: MessageEvent<MainToWorkerMessage>
 
   if (msg.type === 'INIT') {
     try {
-      const vision = await FilesetResolver.forVisionTasks(
-        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
-      );
-      landmarker = await PoseLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: msg.modelUrl,
-          delegate: 'GPU'
-        },
-        runningMode: 'IMAGE',  // IMAGE mode — frames are non-sequential
-        numPoses: 2
-      });
+      const vision = await FilesetResolver.forVisionTasks(msg.wasmBaseUrl);
+
+      // Try GPU first, fall back to CPU
+      const delegates: Array<'GPU' | 'CPU'> = ['GPU', 'CPU'];
+      let lastErr: unknown;
+      for (const delegate of delegates) {
+        try {
+          landmarker = await PoseLandmarker.createFromOptions(vision, {
+            baseOptions: { modelAssetPath: msg.modelUrl, delegate },
+            runningMode: 'IMAGE',
+            numPoses: 2
+          });
+          break;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+
+      if (!landmarker) throw lastErr;
       const reply: WorkerToMainMessage = { type: 'INIT_DONE' };
       self.postMessage(reply);
     } catch (err) {
-      // Fall back to CPU delegate
-      try {
-        const vision = await FilesetResolver.forVisionTasks(
-          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
-        );
-        landmarker = await PoseLandmarker.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath: msg.modelUrl,
-            delegate: 'CPU'
-          },
-          runningMode: 'IMAGE',
-          numPoses: 2
-        });
-        const reply: WorkerToMainMessage = { type: 'INIT_DONE' };
-        self.postMessage(reply);
-      } catch (err2) {
-        const reply: WorkerToMainMessage = {
-          type: 'INIT_ERROR',
-          error: String(err2)
-        };
-        self.postMessage(reply);
-      }
+      const reply: WorkerToMainMessage = { type: 'INIT_ERROR', error: String(err) };
+      self.postMessage(reply);
     }
     return;
   }

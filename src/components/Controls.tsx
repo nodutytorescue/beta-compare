@@ -4,6 +4,7 @@ interface ControlsProps {
   isPlaying: boolean;
   playbackSpeed: number;
   scrubberRef: RefObject<HTMLInputElement>;
+  disabled?: boolean;
   onPlayPause: () => void;
   onSpeedChange: (speed: number) => void;
   onScrub: (progress: number) => void;
@@ -16,6 +17,7 @@ export default function Controls({
   isPlaying,
   playbackSpeed,
   scrubberRef,
+  disabled = false,
   onPlayPause,
   onSpeedChange,
   onScrub,
@@ -31,7 +33,8 @@ export default function Controls({
         max="1000"
         defaultValue="0"
         step="1"
-        className="scrubber"
+        disabled={disabled}
+        className="scrubber disabled:opacity-40"
         onInput={e => onScrub(Number((e.target as HTMLInputElement).value) / 1000)}
         aria-label="Progress scrubber"
       />
@@ -41,10 +44,11 @@ export default function Controls({
         {/* Play/Pause */}
         <button
           onClick={onPlayPause}
-          className="w-10 h-10 flex items-center justify-center rounded-full bg-sky-600 hover:bg-sky-500 transition-colors text-white text-lg"
+          disabled={disabled}
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-sky-600 hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-white text-lg"
           aria-label={isPlaying ? 'Pause' : 'Play'}
         >
-          {isPlaying ? '⏸' : '▶'}
+          {disabled ? '⏳' : isPlaying ? '⏸' : '▶'}
         </button>
 
         {/* Speed selector */}
@@ -53,7 +57,8 @@ export default function Controls({
             <button
               key={s}
               onClick={() => onSpeedChange(s)}
-              className={`text-xs px-2 py-1 rounded transition-colors ${
+              disabled={disabled}
+              className={`text-xs px-2 py-1 rounded transition-colors disabled:opacity-40 ${
                 playbackSpeed === s
                   ? 'bg-sky-600 text-white'
                   : 'bg-slate-700 text-slate-300 hover:bg-slate-600'

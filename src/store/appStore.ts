@@ -67,7 +67,11 @@ export const useAppStore = create<AppState>()(
       }),
 
     addAttempt: (record) =>
-      set(state => { state.attempts.push(record); }),
+      set(state => {
+        const idx = state.attempts.findIndex(a => a.id === record.id);
+        if (idx >= 0) state.attempts[idx] = record; // upsert
+        else state.attempts.push(record);
+      }),
 
     removeAttempt: (id) =>
       set(state => {

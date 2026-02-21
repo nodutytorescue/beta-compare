@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAppStore } from '../store/appStore';
 import { getBlobUrl } from '../lib/db';
 import { timeAtProgress } from '../lib/progressCurve';
@@ -8,7 +8,6 @@ import VideoPanel from './VideoPanel';
 import Controls from './Controls';
 import SyncMarkers from './SyncMarkers';
 
-// Inner component receives guaranteed non-null comparison data
 interface PlayerProps {
   attemptA: AttemptRecord;
   attemptB: AttemptRecord;
@@ -32,6 +31,7 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
   const scrubberRef = useRef<HTMLInputElement>(null);
   const syncRef = useRef(new SyncController());
   const isPlayingRef = useRef(false);
+  const [videosReady, setVideosReady] = useState(false);
 
   isPlayingRef.current = isPlaying;
 
@@ -40,33 +40,48 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
   const leaderAttempt = leader === 'A' ? attemptA : attemptB;
   const followerAttempt = leader === 'A' ? attemptB : attemptA;
 
-  // Load blob URLs
+  // Load blob URLs and wait for both videos to be ready
   useEffect(() => {
     let cancelled = false;
-    const urls: string[] = [];
+    setVideosReady(false);
+    const urlsToRevoke: string[] = [];
 
     (async () => {
-      const [urlA, urlB] = await Promise.all([
-        getBlobUrl(attemptA.blobKey),
-        getBlobUrl(attemptB.blobKey)
-      ]);
-      if (cancelled) {
-        URL.revokeObjectURL(urlA);
-        URL.revokeObjectURL(urlB);
-        return;
+      try {
+        const [urlA, urlB] = await Promise.all([
+          getBlobUrl(attemptA.blobKey),
+          getBlobUrl(attemptB.blobKey)
+        ]);
+        if (cancelled) { URL.revokeObjectURL(urlA); URL.revokeObjectURL(urlB); return; }
+        urlsToRevoke.push(urlA, urlB);
+
+        const va = videoARef.current;
+        const vb = videoBRef.current;
+        if (!va || !vb) return;
+
+        // Wait for both to have enough data to play
+        const readyPromise = (v: HTMLVideoElement, src: string) =>
+          new Promise<void>((resolve) => {
+            v.src = src;
+            v.addEventListener('canplay', () => resolve(), { once: true });
+            // canplay might already have fired if src was cached
+            if (v.readyState >= 3) resolve();
+          });
+
+        await Promise.all([readyPromise(va, urlA), readyPromise(vb, urlB)]);
+        if (!cancelled) setVideosReady(true);
+      } catch (err) {
+        console.error('Failed to load videos:', err);
       }
-      urls.push(urlA, urlB);
-      if (videoARef.current) videoARef.current.src = urlA;
-      if (videoBRef.current) videoBRef.current.src = urlB;
     })();
 
     return () => {
       cancelled = true;
-      urls.forEach(u => URL.revokeObjectURL(u));
+      urlsToRevoke.forEach(u => URL.revokeObjectURL(u));
     };
   }, [attemptA.blobKey, attemptB.blobKey]);
 
-  // Configure SyncController when roles/markers change
+  // Configure SyncController when roles/markers/curves change
   useEffect(() => {
     const lv = leaderVideoRef.current;
     const fv = followerVideoRef.current;
@@ -87,13 +102,10 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
     });
   }, [leader, syncMarkers, leaderAttempt, followerAttempt, leaderVideoRef, followerVideoRef]);
 
-  // Start/stop rAF loop
+  // Start/stop rAF loop with isPlaying
   useEffect(() => {
-    if (isPlaying) {
-      syncRef.current.start();
-    } else {
-      syncRef.current.stop();
-    }
+    if (isPlaying) syncRef.current.start();
+    else syncRef.current.stop();
     return () => syncRef.current.stop();
   }, [isPlaying]);
 
@@ -106,7 +118,9 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
       setIsPlaying(false);
     } else {
       lv.playbackRate = playbackSpeed;
-      lv.play().then(() => setIsPlaying(true)).catch(console.error);
+      lv.play().then(() => setIsPlaying(true)).catch(err => {
+        console.error('play() failed:', err);
+      });
     }
   }, [leaderVideoRef, playbackSpeed, setIsPlaying]);
 
@@ -118,10 +132,15 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
   const handleScrub = useCallback((progress: number) => {
     const lv = leaderVideoRef.current;
     if (!lv) return;
+
     const curve = leaderAttempt.progressCurve;
-    if (curve.length === 0) return;
-    const ms = timeAtProgress(curve, progress);
-    lv.currentTime = ms / 1000;
+    if (curve.length > 0) {
+      // Curve-based seek
+      lv.currentTime = timeAtProgress(curve, progress) / 1000;
+    } else {
+      // Fallback: treat progress as fraction of duration
+      lv.currentTime = progress * (lv.duration || 0);
+    }
     syncRef.current.syncOnce();
   }, [leaderVideoRef, leaderAttempt.progressCurve]);
 
@@ -129,14 +148,22 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
     addSyncMarker(marker);
   }, [addSyncMarker]);
 
-  // Read current times for marker display (approximate — not reactive)
+  // Pause + reset when leader ends
+  useEffect(() => {
+    const lv = leaderVideoRef.current;
+    if (!lv) return;
+    const onEnded = () => setIsPlaying(false);
+    lv.addEventListener('ended', onEnded);
+    return () => lv.removeEventListener('ended', onEnded);
+  }, [leaderVideoRef, setIsPlaying]);
+
   const leaderTime = leaderVideoRef.current?.currentTime ?? 0;
   const followerTime = followerVideoRef.current?.currentTime ?? 0;
 
   return (
-    <div className="h-dvh flex flex-col landscape:flex-row bg-slate-900 text-slate-100 overflow-hidden">
+    <div className="h-dvh flex flex-col bg-slate-900 text-slate-100 overflow-hidden">
       {/* Videos */}
-      <div className="flex flex-col landscape:flex-row flex-1 min-h-0 gap-1 p-1">
+      <div className="flex flex-row flex-1 min-h-0 gap-1 p-1">
         <VideoPanel
           ref={videoARef}
           attempt={attemptA}
@@ -154,11 +181,12 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
       </div>
 
       {/* Controls panel */}
-      <div className="flex-shrink-0 flex flex-col gap-2 p-2 bg-slate-900 border-t landscape:border-t-0 landscape:border-l border-slate-700 landscape:w-64 overflow-y-auto">
+      <div className="flex-shrink-0 flex flex-col gap-2 p-2 bg-slate-900 border-t border-slate-700 overflow-y-auto">
         <Controls
           isPlaying={isPlaying}
           playbackSpeed={playbackSpeed}
           scrubberRef={scrubberRef}
+          disabled={!videosReady}
           onPlayPause={handlePlayPause}
           onSpeedChange={handleSpeedChange}
           onScrub={handleScrub}
@@ -187,7 +215,6 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
 
 export default function PlayerScreen() {
   const comparison = useAppStore(s => s.comparison);
-
   if (!comparison) return null;
 
   return (
