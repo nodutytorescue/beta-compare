@@ -15,6 +15,7 @@ export default function TrimScreen() {
   const goToImport = useAppStore(s => s.goToImport);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const unlockedRef = useRef(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -37,7 +38,6 @@ export default function TrimScreen() {
     if (!v) return;
     setDuration(v.duration);
     setTrimEnd(v.duration);
-    v.pause(); // stop autoplay after first frame is visible
   };
 
   const handleTimeUpdate = () => {
@@ -49,8 +49,14 @@ export default function TrimScreen() {
     const v = videoRef.current;
     if (!v || duration === 0) return;
     const t = (Number(e.target.value) / 1000) * duration;
-    v.currentTime = t;
-    setCurrentTime(t);
+    const seek = () => { v.currentTime = t; setCurrentTime(t); };
+    // First scrub on iOS: play() inside a user gesture unlocks frame rendering
+    if (!unlockedRef.current) {
+      unlockedRef.current = true;
+      v.play().then(() => { v.pause(); seek(); }).catch(() => seek());
+    } else {
+      seek();
+    }
   };
 
   const handleSetStart = () => {
@@ -97,7 +103,6 @@ export default function TrimScreen() {
             className="max-h-full max-w-full"
             playsInline
             muted
-            autoPlay
             preload="auto"
             onLoadedMetadata={handleMetadata}
             onTimeUpdate={handleTimeUpdate}
