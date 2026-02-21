@@ -118,42 +118,49 @@ export function progressAtTime(curve: ProgressPoint[], timestampMs: number): num
   return a.progress + t * (b.progress - a.progress);
 }
 
-/** Inverse lookup: progress → time (ms). Forward-searches from searchFromMs to handle non-monotonic curves. */
+/** Inverse lookup: progress → time (ms). Searches forward from searchFromMs, then backward if not found. */
 export function timeAtProgress(
   curve: ProgressPoint[],
   targetProgress: number,
   searchFromMs = 0
 ): number {
   if (curve.length === 0) return 0;
-  // Clamp to curve range
-  if (targetProgress <= curve[0].progress) return curve[0].timestamp;
-  if (targetProgress >= curve[curve.length - 1].progress) return curve[curve.length - 1].timestamp;
+  if (curve.length === 1) return curve[0].timestamp;
 
-  // Find starting index
+  // Find starting index from hint
   let startIdx = 0;
   for (let i = 0; i < curve.length; i++) {
     if (curve[i].timestamp >= searchFromMs) { startIdx = i; break; }
   }
 
-  // Search forward from startIdx
-  for (let i = startIdx; i < curve.length - 1; i++) {
+  const interpolate = (i: number): number | null => {
     const a = curve[i], b = curve[i + 1];
-    if ((a.progress <= targetProgress && b.progress >= targetProgress) ||
-        (a.progress >= targetProgress && b.progress <= targetProgress)) {
-      const span = b.progress - a.progress;
-      if (Math.abs(span) < 1e-6) return a.timestamp;
-      const t = (targetProgress - a.progress) / span;
-      return a.timestamp + t * (b.timestamp - a.timestamp);
-    }
+    const crosses =
+      (a.progress <= targetProgress && b.progress >= targetProgress) ||
+      (a.progress >= targetProgress && b.progress <= targetProgress);
+    if (!crosses) return null;
+    const span = b.progress - a.progress;
+    if (Math.abs(span) < 1e-6) return a.timestamp;
+    const t = (targetProgress - a.progress) / span;
+    return a.timestamp + t * (b.timestamp - a.timestamp);
+  };
+
+  // Forward search from hint
+  for (let i = startIdx; i < curve.length - 1; i++) {
+    const t = interpolate(i);
+    if (t !== null) return t;
   }
 
-  // Fallback: global nearest
-  let bestIdx = 0, bestDist = Infinity;
-  for (let i = 0; i < curve.length; i++) {
-    const d = Math.abs(curve[i].progress - targetProgress);
-    if (d < bestDist) { bestDist = d; bestIdx = i; }
+  // Backward search from hint (handles scrub-backward + non-monotonic leading edge)
+  for (let i = Math.min(startIdx - 1, curve.length - 2); i >= 0; i--) {
+    const t = interpolate(i);
+    if (t !== null) return t;
   }
-  return curve[bestIdx].timestamp;
+
+  // Clamp to nearest endpoint
+  const distFirst = Math.abs(curve[0].progress - targetProgress);
+  const distLast = Math.abs(curve[curve.length - 1].progress - targetProgress);
+  return distFirst <= distLast ? curve[0].timestamp : curve[curve.length - 1].timestamp;
 }
 
 /** Group consecutive low-confidence frames into ranges for sparkline shading. */

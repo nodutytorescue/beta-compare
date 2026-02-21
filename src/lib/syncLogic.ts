@@ -172,6 +172,7 @@ export class SyncController {
 
   /** Force a single sync tick (used when scrubber moves while paused). */
   syncOnce(): void {
+    this.lastFollowerSearchMs = 0; // reset hint so backward scrub finds the right segment
     this.update();
   }
 }

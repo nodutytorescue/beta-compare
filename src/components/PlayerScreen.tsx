@@ -134,14 +134,13 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
     if (!lv) return;
 
     const curve = leaderAttempt.progressCurve;
-    if (curve.length > 0) {
-      // Curve-based seek
-      lv.currentTime = timeAtProgress(curve, progress) / 1000;
-    } else {
-      // Fallback: treat progress as fraction of duration
-      lv.currentTime = progress * (lv.duration || 0);
-    }
-    syncRef.current.syncOnce();
+    const targetTime = curve.length > 0
+      ? timeAtProgress(curve, progress) / 1000
+      : progress * (lv.duration || 0);
+
+    lv.currentTime = targetTime;
+    // Sync follower only after the leader's seek has actually landed
+    lv.addEventListener('seeked', () => syncRef.current.syncOnce(), { once: true });
   }, [leaderVideoRef, leaderAttempt.progressCurve]);
 
   const handleAddMarker = useCallback((marker: SyncMarker) => {
