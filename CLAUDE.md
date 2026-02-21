@@ -1,109 +1,72 @@
-# Beta Compare — Claude Context
+# Beta Compare — Project Context
 
-Side-by-side bouldering video comparison PWA. Videos are synced by **route progress** (hip-Y curve from MediaPipe pose) not wall-clock time. Fully client-side, no backend.
+## What it is
+A mobile-first PWA for side-by-side bouldering video comparison. Two climbing attempts are shown together so a climber can compare moments without holding one in memory while watching the other.
 
-## Stack
+## Live / Dev
+- **Repo:** github.com/nodutytorescue/beta-compare
+- **Live:** nodutytorescue.github.io/beta-compare (auto-deploys on push to main via GitHub Actions)
+- **Dev:** `npm run dev` in `/Users/bwo/beta-compare` → localhost:5173
+
+## Tech Stack
 - React 18 + TypeScript, Vite 5, Tailwind CSS
-- `@mediapipe/tasks-vision@0.10.14` (Tasks API)
-- `idb@8` IndexedDB persistence
-- `zustand@4.5.4` + immer middleware
-- `vite-plugin-pwa@0.20.1`
+- `idb@8` for IndexedDB (stores video ArrayBuffers + AttemptRecord metadata)
+- `zustand@4.5.4` + immer for state
+- No backend, no pose detection, no MediaPipe — fully client-side
 
-## File Map
+## Current Flow
+1. **Import** — pick a video file from Photos/Files, stored as ArrayBuffer in IndexedDB
+2. **Trim** — scrub to mark start/end of climbing portion, saves trimStart/trimEnd/duration
+3. **Library** — shows all trimmed attempts, select two to compare
+4. **Player** — side-by-side videos, each with independent scrubber, master play/pause button
+
+## File Structure
 ```
 src/
-  App.tsx                  — screen router (import / processing / player)
-  types/index.ts           — all shared types + worker message protocol
-  store/appStore.ts        — Zustand store; addAttempt is an UPSERT
-  lib/
-    db.ts                  — IDB: attempts store + blobs store (ArrayBuffer)
-    progressCurve.ts       — extract → interpolate → smooth → normalize → query
-    syncLogic.ts           — SyncController rAF loop + blendedTimeFromMarkers
+  App.tsx                  — screen router (import | trim | player)
+  types/index.ts           — AttemptRecord, TrimState, ComparisonState, Screen
+  store/appStore.ts        — Zustand store, navigation actions
+  lib/db.ts                — IndexedDB: saveAttempt, getBlobUrl, updateAttemptRecord, deleteAttempt
   components/
-    ImportScreen.tsx       — library, file picker (<label> wrapping <input>), pair selector
-    ProcessingScreen.tsx   — frame extraction + pose detection on main thread
-    PlayerScreen.tsx       — orchestrates videos, SyncController, controls
-    VideoPanel.tsx         — single <video> + sparkline strip
-    SparklineChart.tsx     — SVG progress curve with low-confidence shading
-    SyncMarkers.tsx        — marker list + "Mark Here" button (max 8)
-    Controls.tsx           — play/pause, speed, scrubber, swap
-  workers/
-    poseWorker.ts          — KEPT BUT UNUSED (see gotcha #3 below)
-public/
-  pose_landmarker_lite.task — 5.5 MB model, served statically
-  wasm/                    — 4 MediaPipe WASM files copied from node_modules
-  _headers                 — Netlify COOP/COEP headers
+    ImportScreen.tsx       — library list, file picker, pair selector
+    TrimScreen.tsx         — scrubber + Set Start/End + Done, saves to db+store
+    PlayerScreen.tsx       — holds videoARef/videoBRef, master play/pause, isPlaying state
+    VideoPanel.tsx         — forwardRef, self-contained scrubber, onTrimEnd callback
 ```
 
-## Architecture Decisions
-
-### MediaPipe runs on the main thread
-The worker (`poseWorker.ts`) exists but is unused. MediaPipe's Emscripten WASM loader calls `importScripts()` internally, which is blocked in module workers. In Vite dev mode there is no workaround — Vite only bundles workers as IIFE in production. Main-thread processing is the reliable cross-env solution.
-
-### Module-level landmarker singleton
-`ProcessingScreen.tsx` uses a module-level `_landmarkerPromise` (not a component ref) because MediaPipe's WASM runtime is itself a singleton — re-initialising it on component remount causes silent failures on the second video.
-
-### COEP: credentialless (not require-corp)
-`require-corp` blocks jsDelivr and other CDNs that don't set `CORP: cross-origin`. `credentialless` still enables cross-origin isolation (required for SharedArrayBuffer) while allowing third-party resources. Set in `vite.config.ts` for dev/preview and `public/_headers` for Netlify production.
-
-### WASM served locally
-Files in `public/wasm/` are copied from `node_modules/@mediapipe/tasks-vision/wasm/`. This avoids any CDN CORS/COEP issues. `FilesetResolver.forVisionTasks()` is pointed at `${window.location.origin}/wasm`.
-
-### addAttempt is an upsert
-`ImportScreen` adds a stub record before processing; `ProcessingScreen` calls `addAttempt` again with the completed curve. If it were a push instead of upsert it would duplicate.
-
-### Player layout is always flex-row
-Side-by-side always, no portrait stacking. `h-dvh` (not `h-screen`) for iOS Safari toolbar.
-
-### Scrubber fallback
-If `progressCurve` is empty, scrubber falls back to `progress × duration` (wall-clock seek).
-
-## Key Gotchas
-1. **IMAGE mode, not VIDEO** — VIDEO mode requires monotonic timestamps; seek-based extraction breaks it.
-2. **Transfer ImageBitmap** — if you re-enable the worker, always pass transfer list: `postMessage(msg, [msg.bitmap])`.
-3. **`seeked` event, not setTimeout** — never issue next seek until `seeked` fires; queued seeks lose frames.
-4. **`fastSeek()` feature detect** — use `(video as object)` for the `in` check to avoid TypeScript narrowing `video` to `never`.
-5. **iOS autoplay** — `play()` must be called in a direct user-event handler, not a Promise chain.
-6. **Blob URL cleanup** — always `URL.revokeObjectURL()` in cleanup to avoid memory leaks.
-7. **immer sub-path** — `import { immer } from 'zustand/middleware/immer'` not `'zustand/middleware'`.
-8. **React StrictMode** — double-invocation can cause two concurrent processing runs; `abortRef` guards against this.
-
-## Processing Pipeline (ProcessingScreen.tsx)
-```
-loadedmetadata → totalFrames = ceil(duration × FPS/FRAME_STEP)   [FPS=10, FRAME_STEP=3]
-for each frame:
-  video.currentTime = t → await seeked
-  ctx.drawImage(video, canvas)
-  landmarker.detect(canvas)          ← synchronous, blocks ~50-200ms
-  pickClimber(landmarks)             ← pick highest pose, filter belayer (avgY > 0.75)
-  results.push(...)
-  incrementProcessed()
-  await setTimeout(0)                ← yield to browser for repaint
-buildProgressCurve(results) → updateAttemptRecord → goToImport
+## Key Types
+```typescript
+interface AttemptRecord {
+  id: string;
+  name: string;
+  blobKey: string;
+  mimeType: string;    // preserve original (video/quicktime for iPhone .mov)
+  duration: number;
+  trimStart: number;
+  trimEnd: number;
+  createdAt: number;
+}
 ```
 
-## Progress Curve Pipeline (lib/progressCurve.ts)
-1. `extractHipProgress` — hip midpoint Y, inverted (`1 - y`)
-2. `interpolateGaps` — linear interp through zero-confidence frames
-3. `applyMovingAverage` — centred window=15, smooths progress only
-4. `normalizeProgressCurve` — rescale to [0,1] using detected frames only
-5. `buildProgressCurve` — convenience wrapper for steps 1–4
+## Important iOS Gotchas
+1. **MIME type** — iPhone videos are `video/quicktime` (.mov). Always use `file.type` on import, store it, and pass it to `getBlobUrl`. Hardcoding `video/mp4` breaks iOS playback.
+2. **Frame rendering unlock** — iOS won't show any video frame without a play gesture. In TrimScreen, the first scrub calls `play()` → `pause()` → `seek()` to unlock frame rendering. Tracked with `unlockedRef`.
+3. **VideoPanel** — uses `forwardRef<HTMLVideoElement>` so PlayerScreen can control play/pause directly on the video element.
+4. **`playsInline` + `muted`** — both required on every `<video>` element or iOS will go fullscreen / block autoplay.
 
-Query: `progressAtTime` (binary search + lerp), `timeAtProgress` (forward search from hint)
+## What's Next — Sync Markers
+The main remaining feature. Goal: make the shared scrubber route-aware instead of time-aware.
 
-## Sync Logic (lib/syncLogic.ts)
-- `SyncController` rAF loop: reads leader.currentTime → `progressAtTime` → `blendedTimeFromMarkers` → `seekVideo(follower)`
-- Follower is always paused, only seeked. Only leader plays/pauses.
-- `blendedTimeFromMarkers`: piecewise-linear within marker range, auto-curve outside.
-- `seekVideo`: `fastSeek()` if available, skip if within 33ms threshold.
+**Design:**
+- User scrubs each video independently to find an equivalent moment (e.g. both at the crux hold)
+- Taps "Sync Here" → captures both current timestamps as a sync point `{ timeA, timeB }`
+- Can add multiple sync points across the climb
+- Master scrubber then moves both videos by interpolating between sync points
+- Between two sync points, progress through A maps linearly to progress through B
 
-## Deploy
-- **Netlify** — `netlify deploy --prod --dir dist` (CLI) or connect GitHub repo in Netlify UI
-- `public/_headers` sets COOP/COEP for production automatically
-- Large files (model + WASM, ~24 MB) are not precached by service worker but are served and browser-cached
+**Why not automatic sync:** attempts can differ significantly — holds skipped, rest time varies, moves change. The user is the only reliable source of truth for what "equivalent" means.
 
-## Current Known Issues / Next Work
-- [ ] Processing blocks main thread — consider OffscreenCanvas + worker for production builds only
-- [ ] No rename UI for attempts
-- [ ] Sparkline cursor not implemented
-- [ ] No scrubber thumb sync during playback (DOM update via ref needed)
+## Deployment
+Push to `main` → GitHub Actions builds and deploys to GitHub Pages automatically (~30s).
+No Netlify, no PWA service worker — just a static Vite build.
+`vite.config.ts` sets `base: '/beta-compare/'` when `GITHUB_ACTIONS` env var is present.
