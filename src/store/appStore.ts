@@ -1,18 +1,20 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import type { AttemptRecord, ComparisonState, ProcessingState, Screen, SyncMarker, TrimState } from '../types';
+import type { AttemptRecord, ComparisonState, Hold, HoldMarkingState, ProcessingState, Screen, SyncMarker, TrimState } from '../types';
 
 interface AppState {
   screen: Screen;
   attempts: AttemptRecord[];
   trim: TrimState | null;
+  holdMarking: HoldMarkingState | null;
   processing: ProcessingState | null;
   comparison: ComparisonState | null;
 
   // Navigation
   goToImport: () => void;
   goToTrim: (attemptId: string, fileName: string) => void;
-  goToProcessing: (attemptId: string, fileName: string, trimStart: number, trimEnd: number) => void;
+  goToHoldMarking: (attemptId: string, fileName: string, trimStart: number, trimEnd: number) => void;
+  goToProcessing: (attemptId: string, fileName: string, trimStart: number, trimEnd: number, holds: Hold[]) => void;
   goToPlayer: (a: AttemptRecord, b: AttemptRecord) => void;
 
   // Attempt library
@@ -39,6 +41,7 @@ export const useAppStore = create<AppState>()(
     screen: 'import',
     attempts: [],
     trim: null,
+    holdMarking: null,
     processing: null,
     comparison: null,
 
@@ -46,6 +49,7 @@ export const useAppStore = create<AppState>()(
       set(state => {
         state.screen = 'import';
         state.trim = null;
+        state.holdMarking = null;
         state.processing = null;
         state.comparison = null;
       }),
@@ -56,10 +60,16 @@ export const useAppStore = create<AppState>()(
         state.trim = { attemptId, fileName };
       }),
 
-    goToProcessing: (attemptId, fileName, trimStart, trimEnd) =>
+    goToHoldMarking: (attemptId, fileName, trimStart, trimEnd) =>
+      set(state => {
+        state.screen = 'hold-marking';
+        state.holdMarking = { attemptId, fileName, trimStart, trimEnd };
+      }),
+
+    goToProcessing: (attemptId, fileName, trimStart, trimEnd, holds) =>
       set(state => {
         state.screen = 'processing';
-        state.processing = { attemptId, fileName, trimStart, trimEnd, totalFrames: 0, processedFrames: 0 };
+        state.processing = { attemptId, fileName, trimStart, trimEnd, holds, totalFrames: 0, processedFrames: 0 };
       }),
 
     goToPlayer: (a, b) =>

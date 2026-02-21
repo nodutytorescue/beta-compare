@@ -1,4 +1,52 @@
-import type { ProgressPoint } from '../types';
+import type { Hold, ProgressPoint } from '../types';
+
+// ─── Route polyline projection ───────────────────────────────────────────────
+
+/**
+ * Project a point (px, py) onto the polyline defined by holds and return
+ * how far along the polyline (0 = start hold, 1 = finish hold) the nearest
+ * projection falls. Falls back to 0 if fewer than 2 holds.
+ */
+export function progressAlongPolyline(holds: Hold[], px: number, py: number): number {
+  if (holds.length < 2) return 0;
+
+  let totalLen = 0;
+  const segLens: number[] = [];
+  for (let i = 0; i < holds.length - 1; i++) {
+    const len = Math.hypot(holds[i + 1].x - holds[i].x, holds[i + 1].y - holds[i].y);
+    segLens.push(len);
+    totalLen += len;
+  }
+  if (totalLen === 0) return 0;
+
+  let bestProgress = 0;
+  let bestDist = Infinity;
+  let cumLen = 0;
+
+  for (let i = 0; i < holds.length - 1; i++) {
+    const ax = holds[i].x, ay = holds[i].y;
+    const bx = holds[i + 1].x, by = holds[i + 1].y;
+    const slen = segLens[i];
+
+    let t = 0;
+    if (slen > 0) {
+      t = ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / (slen * slen);
+      t = Math.max(0, Math.min(1, t));
+    }
+
+    const projX = ax + t * (bx - ax);
+    const projY = ay + t * (by - ay);
+    const dist = Math.hypot(px - projX, py - projY);
+
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestProgress = (cumLen + t * slen) / totalLen;
+    }
+    cumLen += slen;
+  }
+
+  return bestProgress;
+}
 
 // ─── Step 1: Extract hip progress from raw frame results ────────────────────
 

@@ -2,8 +2,8 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import { useAppStore } from '../store/appStore';
 import { getBlobUrl, updateAttemptRecord, getAttempt } from '../lib/db';
-import { buildProgressCurve } from '../lib/progressCurve';
-import type { AttemptRecord } from '../types';
+import { buildProgressCurve, progressAlongPolyline } from '../lib/progressCurve';
+import type { AttemptRecord, Hold } from '../types';
 
 const FPS = 10;
 const FRAME_STEP = 3;
@@ -43,7 +43,8 @@ function getLandmarker(): Promise<PoseLandmarker> {
 
 // ─── Climber picker ───────────────────────────────────────────────────────────
 function pickClimber(
-  landmarks: Array<Array<{ x: number; y: number; z: number; visibility?: number }>>
+  landmarks: Array<Array<{ x: number; y: number; z: number; visibility?: number }>>,
+  holds: Hold[]
 ): { progress: number; confidence: number } | null {
   if (landmarks.length === 0) return null;
 
@@ -58,8 +59,13 @@ function pickClimber(
   const leftHip = pose[23], rightHip = pose[24];
   if (!leftHip || !rightHip) return null;
 
+  const hipX = (leftHip.x + rightHip.x) / 2;
+  const hipY = (leftHip.y + rightHip.y) / 2;
+
   return {
-    progress: 1 - (leftHip.y + rightHip.y) / 2,
+    progress: holds.length >= 2
+      ? progressAlongPolyline(holds, hipX, hipY)
+      : 1 - hipY,
     confidence: ((leftHip.visibility ?? 0) + (rightHip.visibility ?? 0)) / 2
   };
 }
@@ -80,7 +86,8 @@ export default function ProcessingScreen() {
     attemptId: string,
     fileName: string,
     trimStart: number,
-    trimEnd: number
+    trimEnd: number,
+    holds: Hold[]
   ) => {
     abortRef.current = false;
     setError(null);
@@ -135,7 +142,8 @@ export default function ProcessingScreen() {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const result = landmarker.detect(canvas);
       const picked = pickClimber(
-        result.landmarks as Array<Array<{ x: number; y: number; z: number; visibility?: number }>>
+        result.landmarks as Array<Array<{ x: number; y: number; z: number; visibility?: number }>>,
+        holds
       );
       results.push({
         timestampMs,
@@ -154,7 +162,7 @@ export default function ProcessingScreen() {
     const curve = buildProgressCurve(results);
     const existing = await getAttempt(attemptId);
     if (existing) {
-      const updated: AttemptRecord = { ...existing, progressCurve: curve, duration, trimStart: clampedStart, trimEnd: clampedEnd };
+      const updated: AttemptRecord = { ...existing, progressCurve: curve, duration, trimStart: clampedStart, trimEnd: clampedEnd, holds };
       await updateAttemptRecord(updated);
       addAttempt(updated);
     }
@@ -165,7 +173,7 @@ export default function ProcessingScreen() {
 
   useEffect(() => {
     if (!processing?.attemptId) return;
-    runProcessing(processing.attemptId, processing.fileName, processing.trimStart, processing.trimEnd).catch(err => {
+    runProcessing(processing.attemptId, processing.fileName, processing.trimStart, processing.trimEnd, processing.holds).catch(err => {
       console.error('Processing failed:', err);
       setError(err instanceof Error ? err.message : String(err));
     });

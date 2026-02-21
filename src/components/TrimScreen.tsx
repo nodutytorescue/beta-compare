@@ -10,7 +10,7 @@ function formatTime(s: number): string {
 
 export default function TrimScreen() {
   const trim = useAppStore(s => s.trim);
-  const goToProcessing = useAppStore(s => s.goToProcessing);
+  const goToHoldMarking = useAppStore(s => s.goToHoldMarking);
   const goToImport = useAppStore(s => s.goToImport);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -71,7 +71,7 @@ export default function TrimScreen() {
     const v = videoRef.current;
     if (!v) return;
     v.pause();
-    goToProcessing(trim.attemptId, trim.fileName, trimStart, trimEnd);
+    goToHoldMarking(trim.attemptId, trim.fileName, trimStart, trimEnd);
   };
 
   const isFullVideo = trimStart === 0 && trimEnd === duration;
@@ -155,7 +155,7 @@ export default function TrimScreen() {
           disabled={!blobUrl || duration === 0}
           className="w-full bg-sky-600 hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors"
         >
-          Process Video →
+          Mark Holds →
         </button>
 
         <button
