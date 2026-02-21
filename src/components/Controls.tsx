@@ -2,24 +2,18 @@ import type { RefObject } from 'react';
 
 interface ControlsProps {
   isPlaying: boolean;
-  playbackSpeed: number;
   scrubberRef: RefObject<HTMLInputElement>;
   disabled?: boolean;
   onPlayPause: () => void;
-  onSpeedChange: (speed: number) => void;
   onScrub: (progress: number) => void;
   onSwapLeader: () => void;
 }
 
-const SPEEDS = [0.25, 0.5, 1, 1.5, 2];
-
 export default function Controls({
   isPlaying,
-  playbackSpeed,
   scrubberRef,
   disabled = false,
   onPlayPause,
-  onSpeedChange,
   onScrub,
   onSwapLeader
 }: ControlsProps) {
@@ -40,7 +34,7 @@ export default function Controls({
       />
 
       {/* Buttons row */}
-      <div className="flex items-center gap-3 justify-between">
+      <div className="flex items-center justify-between">
         {/* Play/Pause */}
         <button
           onClick={onPlayPause}
@@ -50,24 +44,6 @@ export default function Controls({
         >
           {disabled ? '⏳' : isPlaying ? '⏸' : '▶'}
         </button>
-
-        {/* Speed selector */}
-        <div className="flex items-center gap-1">
-          {SPEEDS.map(s => (
-            <button
-              key={s}
-              onClick={() => onSpeedChange(s)}
-              disabled={disabled}
-              className={`text-xs px-2 py-1 rounded transition-colors disabled:opacity-40 ${
-                playbackSpeed === s
-                  ? 'bg-sky-600 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              }`}
-            >
-              {s}×
-            </button>
-          ))}
-        </div>
 
         {/* Swap leader */}
         <button

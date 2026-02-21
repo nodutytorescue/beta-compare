@@ -14,13 +14,11 @@ interface PlayerProps {
   leader: 'A' | 'B';
   syncMarkers: SyncMarker[];
   isPlaying: boolean;
-  playbackSpeed: number;
 }
 
-function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSpeed }: PlayerProps) {
+function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying }: PlayerProps) {
   const setLeader = useAppStore(s => s.setLeader);
   const swapLeader = useAppStore(s => s.swapLeader);
-  const setPlaybackSpeed = useAppStore(s => s.setPlaybackSpeed);
   const setIsPlaying = useAppStore(s => s.setIsPlaying);
   const addSyncMarker = useAppStore(s => s.addSyncMarker);
   const removeSyncMarker = useAppStore(s => s.removeSyncMarker);
@@ -31,6 +29,7 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
   const scrubberRef = useRef<HTMLInputElement>(null);
   const syncRef = useRef(new SyncController());
   const isPlayingRef = useRef(false);
+  const maxProgressRef = useRef(0);
   const [videosReady, setVideosReady] = useState(false);
 
   isPlayingRef.current = isPlaying;
@@ -105,8 +104,11 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
       syncMarkers,
       leaderRole: leader,
       onProgressUpdate: (progress) => {
+        // Monotonically advance — hips dipping during a move don't scroll back
+        const display = Math.max(maxProgressRef.current, progress);
+        maxProgressRef.current = display;
         if (scrubberRef.current) {
-          scrubberRef.current.value = String(Math.round(progress * 1000));
+          scrubberRef.current.value = String(Math.round(display * 1000));
         }
       }
     });
@@ -127,17 +129,11 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
       lv.pause();
       setIsPlaying(false);
     } else {
-      lv.playbackRate = playbackSpeed;
       lv.play().then(() => setIsPlaying(true)).catch(err => {
         console.error('play() failed:', err);
       });
     }
-  }, [leaderVideoRef, playbackSpeed, setIsPlaying]);
-
-  const handleSpeedChange = useCallback((speed: number) => {
-    setPlaybackSpeed(speed);
-    if (leaderVideoRef.current) leaderVideoRef.current.playbackRate = speed;
-  }, [leaderVideoRef, setPlaybackSpeed]);
+  }, [leaderVideoRef, setIsPlaying]);
 
   const normLeaderCurveRef = useRef(leaderAttempt.progressCurve);
   useEffect(() => {
@@ -152,13 +148,15 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
     const lv = leaderVideoRef.current;
     if (!lv) return;
 
+    // Reset monotonic max so scrubbing backward doesn't lock the thumb
+    maxProgressRef.current = progress;
+
     const curve = normLeaderCurveRef.current;
     const targetTime = curve.length > 0
       ? timeAtProgress(curve, progress) / 1000
       : progress * (lv.duration || 0);
 
     lv.currentTime = targetTime;
-    // Sync follower only after the leader's seek has actually landed
     lv.addEventListener('seeked', () => syncRef.current.syncOnce(), { once: true });
   }, [leaderVideoRef]);
 
@@ -206,11 +204,9 @@ function Player({ attemptA, attemptB, leader, syncMarkers, isPlaying, playbackSp
       <div className="flex-shrink-0 flex flex-col gap-2 p-2 bg-slate-900 border-t border-slate-700 overflow-y-auto">
         <Controls
           isPlaying={isPlaying}
-          playbackSpeed={playbackSpeed}
           scrubberRef={scrubberRef}
           disabled={!videosReady}
           onPlayPause={handlePlayPause}
-          onSpeedChange={handleSpeedChange}
           onScrub={handleScrub}
           onSwapLeader={swapLeader}
         />
@@ -246,7 +242,6 @@ export default function PlayerScreen() {
       leader={comparison.leader}
       syncMarkers={comparison.syncMarkers}
       isPlaying={comparison.isPlaying}
-      playbackSpeed={comparison.playbackSpeed}
     />
   );
 }
