@@ -12,6 +12,8 @@ export default function TrimScreen() {
   const trim = useAppStore(s => s.trim);
   const attempts = useAppStore(s => s.attempts);
   const addAttempt = useAppStore(s => s.addAttempt);
+  const setSlotA = useAppStore(s => s.setSlotA);
+  const setSlotB = useAppStore(s => s.setSlotB);
   const goToImport = useAppStore(s => s.goToImport);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -80,6 +82,8 @@ export default function TrimScreen() {
       const updated = { ...existing, duration, trimStart, trimEnd };
       await updateAttemptRecord(updated);
       addAttempt(updated);
+      if (trim.slot === 'A') setSlotA(updated);
+      else setSlotB(updated);
     }
     goToImport();
   };

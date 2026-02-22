@@ -14,6 +14,7 @@ export type Screen = 'import' | 'trim' | 'player';
 export interface TrimState {
   attemptId: string;
   fileName: string;
+  slot: 'A' | 'B';
 }
 
 export interface ComparisonState {
