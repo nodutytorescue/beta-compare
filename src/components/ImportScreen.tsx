@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useAppStore } from '../store/appStore';
 import { saveAttempt } from '../lib/db';
 import type { AttemptRecord } from '../types';
@@ -21,25 +21,17 @@ export default function ImportScreen() {
 
   const [activeSlot, setActiveSlot] = useState<'A' | 'B' | null>(null);
   const [importing, setImporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const trimmedAttempts = attempts.filter(a => a.duration > 0);
   const canCompare = selectedA !== null && selectedB !== null;
 
-  const openPicker = (slot: 'A' | 'B') => {
-    setActiveSlot(slot);
-  };
-
+  const openPicker = (slot: 'A' | 'B') => setActiveSlot(slot);
   const closePicker = () => setActiveSlot(null);
 
   const handlePickExisting = (attempt: AttemptRecord) => {
     if (activeSlot === 'A') setSlotA(attempt);
     else setSlotB(attempt);
     closePicker();
-  };
-
-  const handleImportNew = () => {
-    fileInputRef.current?.click();
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,16 +104,6 @@ export default function ImportScreen() {
         </button>
       </div>
 
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="video/*,video/mp4,video/quicktime,video/webm,video/x-m4v"
-        className="sr-only"
-        onChange={handleFileChange}
-        disabled={importing}
-      />
-
       {/* Picker sheet */}
       {activeSlot && (
         <div className="absolute inset-0 z-50 flex flex-col justify-end" onClick={closePicker}>
@@ -156,13 +138,16 @@ export default function ImportScreen() {
             </div>
 
             <div className="p-4 border-t border-slate-700 flex-shrink-0">
-              <button
-                onClick={handleImportNew}
-                disabled={importing}
-                className="w-full bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-semibold py-3 rounded-lg transition-colors"
-              >
+              <label className={`block w-full bg-sky-600 hover:bg-sky-500 text-white font-semibold py-3 rounded-lg text-center transition-colors ${importing ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}>
                 {importing ? 'Reading…' : '+ Import New Video'}
-              </button>
+                <input
+                  type="file"
+                  accept="video/*,video/mp4,video/quicktime,video/webm,video/x-m4v"
+                  className="sr-only"
+                  onChange={handleFileChange}
+                  disabled={importing}
+                />
+              </label>
             </div>
           </div>
         </div>
