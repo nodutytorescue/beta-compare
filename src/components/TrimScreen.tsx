@@ -88,7 +88,7 @@ export default function TrimScreen() {
 
   return (
     <div className="h-dvh flex flex-col bg-slate-900 text-slate-100">
-      <header className="flex items-center px-4 py-3 bg-slate-800 border-b border-slate-700 flex-shrink-0">
+      <header className="flex items-center px-4 pb-3 bg-slate-800 border-b border-slate-700 flex-shrink-0" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
         <div>
           <p className="text-xs text-slate-400 uppercase tracking-wide mb-0.5">Mark climbing portion</p>
           <p className="text-sm font-medium truncate max-w-xs">{trim.fileName}</p>
@@ -110,7 +110,7 @@ export default function TrimScreen() {
         )}
       </div>
 
-      <div className="flex-shrink-0 p-4 bg-slate-900 flex flex-col gap-3">
+      <div className="flex-shrink-0 px-4 pt-4 bg-slate-900 flex flex-col gap-3" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
         <div className="flex justify-between text-xs text-slate-500">
           <span>{formatTime(currentTime)}</span>
           <span>{formatTime(duration)}</span>

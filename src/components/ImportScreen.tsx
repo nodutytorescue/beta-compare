@@ -81,7 +81,7 @@ export default function ImportScreen() {
 
   return (
     <div className="h-dvh flex flex-col bg-slate-900 text-slate-100">
-      <header className="flex items-center justify-between px-4 py-3 bg-slate-800 border-b border-slate-700 flex-shrink-0">
+      <header className="flex items-center justify-between px-4 pb-3 bg-slate-800 border-b border-slate-700 flex-shrink-0" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
         <h1 className="text-lg font-bold tracking-tight">Beta Compare</h1>
         <label className={`cursor-pointer bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors ${importing ? 'opacity-50 pointer-events-none' : ''}`}>
           {importing ? 'Reading…' : '+ Import Video'}
@@ -171,7 +171,7 @@ export default function ImportScreen() {
       </main>
 
       {canCompare && (
-        <footer className="px-4 py-3 bg-slate-800 border-t border-slate-700 flex-shrink-0">
+        <footer className="px-4 pt-3 bg-slate-800 border-t border-slate-700 flex-shrink-0" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
           <button
             onClick={handleCompare}
             className="w-full bg-sky-600 hover:bg-sky-500 text-white font-semibold py-3 rounded-lg transition-colors"

@@ -45,7 +45,7 @@ export default function PlayerScreen() {
       </div>
 
       {/* Master controls */}
-      <div className="flex-shrink-0 flex flex-col items-center gap-2 py-3">
+      <div className="flex-shrink-0 flex flex-col items-center gap-2 pt-3" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
         <button
           onClick={handlePlayPause}
           className="w-12 h-12 flex items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 text-white text-lg transition-colors"
