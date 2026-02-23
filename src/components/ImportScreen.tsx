@@ -96,8 +96,8 @@ function SlotPanel({ slot, selected, importing, onChange }: {
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
   return (
-    <div className="flex-1 flex flex-col rounded-lg overflow-hidden bg-slate-800">
-      <label className="flex-1 flex flex-col items-center justify-center cursor-pointer gap-3 border-2 border-dashed border-slate-700 rounded-lg active:bg-slate-700 transition-colors">
+    <div className="flex-1 flex flex-col rounded-lg bg-slate-800">
+      <label className="relative flex-1 flex flex-col items-center justify-center cursor-pointer gap-3 border-2 border-dashed border-slate-700 rounded-lg active:bg-slate-700 transition-colors">
         {importing ? (
           <p className="text-sm text-slate-400">Reading…</p>
         ) : selected ? (
@@ -124,7 +124,7 @@ function SlotPanel({ slot, selected, importing, onChange }: {
         <input
           type="file"
           accept="video/*,video/mp4,video/quicktime,video/webm,video/x-m4v"
-          className="sr-only"
+          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
           onChange={onChange}
           disabled={importing}
         />
