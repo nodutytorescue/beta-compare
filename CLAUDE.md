@@ -68,5 +68,5 @@ The main remaining feature. Goal: make the shared scrubber route-aware instead o
 
 ## Deployment
 Push to `main` → GitHub Actions builds and deploys to GitHub Pages automatically (~30s).
-No Netlify, no PWA service worker — just a static Vite build.
+No Netlify. Uses `vite-plugin-pwa` for a service worker that auto-updates on deploy.
 `vite.config.ts` sets `base: '/beta-compare/'` when `GITHUB_ACTIONS` env var is present.
