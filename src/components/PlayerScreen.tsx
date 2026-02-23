@@ -39,7 +39,7 @@ export default function PlayerScreen() {
   return (
     <div className="h-dvh flex flex-col bg-slate-900 text-slate-100">
       {/* Videos */}
-      <div className="flex-1 min-h-0 flex flex-row gap-1 p-1">
+      <div className="flex-1 min-h-0 flex flex-row gap-1 px-1 pb-1" style={{ paddingTop: 'max(0.25rem, env(safe-area-inset-top))' }}>
         <VideoPanel ref={videoARef} attempt={comparison.attemptA} label="A" onTrimEnd={handleTrimEnd} />
         <VideoPanel ref={videoBRef} attempt={comparison.attemptB} label="B" onTrimEnd={handleTrimEnd} />
       </div>
